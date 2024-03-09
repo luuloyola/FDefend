@@ -1,6 +1,11 @@
 package com.example.fdefend
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Bundle
@@ -33,9 +38,11 @@ import android.graphics.Paint
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import java.io.IOException
+import java.util.UUID
 
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback{
 
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
@@ -43,6 +50,68 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private var FINE_PERMISSION_CODE: Int = 1
     var currentLocation: Location? = null
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+
+    fun connectToBluetoothDevice(): BluetoothSocket? {
+        val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+
+        // Verificar si el dispositivo soporta Bluetooth
+        if (bluetoothAdapter == null) {
+            println("El dispositivo no soporta Bluetooth")
+            return null
+        }
+
+        // Verificar si Bluetooth está habilitado en el dispositivo
+        if (!bluetoothAdapter.isEnabled) {
+            println("Bluetooth no está habilitado")
+            return null
+        }
+
+        // Iniciar el descubrimiento de dispositivos Bluetooth disponibles
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.BLUETOOTH_SCAN
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return null
+        }
+        if (!bluetoothAdapter.startDiscovery()) {
+            println("No se pudo iniciar el descubrimiento de dispositivos Bluetooth")
+            return null
+        }
+
+        // Esperar hasta que se descubran dispositivos o un tiempo determinado
+        Thread.sleep(5000) // Esperar 5 segundos (puedes ajustar este tiempo según tus necesidades)
+
+        // Obtener una lista de dispositivos descubiertos
+        val devices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
+
+        // Seleccionar un dispositivo de la lista (aquí se selecciona el primero, puedes implementar tu propia lógica de selección)
+        val selectedDevice: BluetoothDevice? = devices?.firstOrNull()
+
+        // Crear un socket Bluetooth con el dispositivo seleccionado
+        val socket: BluetoothSocket? = try {
+            selectedDevice?.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+        } catch (e: IOException) {
+            e.printStackTrace()
+            null
+        }
+
+        // Conectar al dispositivo seleccionado
+        try {
+            socket?.connect()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+
+        return socket
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,11 +122,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         setSupportActionBar(binding.appBarMain.toolbar)
 
-        binding.appBarMain.fab.setOnClickListener { view ->
-            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                    .setAction("Action", null)
-                    .setAnchorView(R.id.fab).show()
-        }
         val drawerLayout: DrawerLayout = binding.drawerLayout
         val navView: NavigationView = binding.navView
         val navController = findNavController(R.id.nav_host_fragment_content_main)
@@ -72,8 +136,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         getLastLocation();
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
 
+        var bluetoothSocket = connectToBluetoothDevice()
+        val dataReader = bluetoothSocket?.let { BluetoothService(it) }
 
+        // Inicia la lectura de datos
+        if (dataReader != null) {
+            dataReader.startReading { message ->
+                // Aquí puedes manejar el mensaje recibido, por ejemplo, mostrarlo en un TextView
+                runOnUiThread {
+                    add_marker_boton(myMap)
+                }
+            }
+        }
     }
+
+
 
     private fun getLastLocation() {
         val task: Task<Location> = if (ActivityCompat.checkSelfPermission(
@@ -137,22 +214,46 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         // Agregar el marcador al mapa
         myMap.addMarker(markerOptions)
         cergy_Markers(myMap)
-        // Add a marker in Sydney and move the camera
-        myMap.moveCamera(CameraUpdateFactory.newLatLng(my_Location))
+        // Move the camera
+        myMap.moveCamera(CameraUpdateFactory.newLatLngZoom(my_Location, 15f))
+    }
+
+    private fun add_marker_boton(googleMap: GoogleMap){
+        getLastLocation()
+        myMap = googleMap
+        val my_Location = LatLng(currentLocation!!.latitude,currentLocation!!.longitude)
+
+        // Crear un marcador personalizado con un color específico y agregarlo al mapa
+        val markerOptions = MarkerOptions()
+            .position(my_Location) // Ubicación del marcador
+
+        // Agregar el marcador al mapa
+        myMap.addMarker(markerOptions)
     }
 
     private fun cergy_Markers(googleMap: GoogleMap){
         myMap = googleMap
-/*
+        lateinit var markerOptions: MarkerOptions
         // Lugares que en Cergy no son seguros
-        
-        // Crear un marcador personalizado con un color específico y agregarlo al mapa
-        val markerOptions = MarkerOptions()
-            .position(my_Location) // Ubicación del marcador
-            .icon(BitmapDescriptorFactory.fromBitmap(getMarkerIcon(celesteColor))) // Color del marcador
 
-        // Agregar el marcador al mapa
-        myMap.addMarker(markerOptions)*/
+        val dangerousParts: Map<Array<String>, DoubleArray> = mapOf(
+            arrayOf("Valley near ENSEA and CROUS", "Robbery occurred at 9 p.m.") to doubleArrayOf(49.0397666604233, 2.0725052969193274),
+            arrayOf("Behind Les Chenes D'or","Assault ocurred at 7 p.m.") to doubleArrayOf(49.03865416014599, 2.0736100997942026),
+            arrayOf("Bridge","Attempted sexual assault at 4 a.m.") to doubleArrayOf(49.037927412758286, 2.074164399521768),
+            arrayOf("Bridge","Drunk people at 3 a.m.") to doubleArrayOf(49.036916917563936, 2.075531166010214),
+            arrayOf("Near Les Linandes", "Assault ocurred at 5 p.m.") to doubleArrayOf(49.04641130463903, 2.0653876663246993),
+            arrayOf("Cemetery", "Attempted robbery at 1 a.m.") to doubleArrayOf(49.04038282034096, 2.065476170117093)
+        )
+
+        for ((event,location) in dangerousParts){
+            val markerOptions = MarkerOptions()
+                .position(LatLng(location[0],location[1])) // Ubicación del marcador
+                .title(event[0])
+                .snippet(event[1])
+            // Agregar el marcador al mapa
+            myMap.addMarker(markerOptions)
+        }
+
     }
 
     override fun onRequestPermissionsResult(
@@ -172,9 +273,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
     // Función para crear un icono personalizado con un color específico
     private fun getMarkerIcon(color: Int): Bitmap {
-        val radius = 15f // Tamaño del círculo del marcador
+        val radius = 17f // Tamaño del círculo del marcador
         val strokeWidth = 2f // Grosor del borde del círculo
-        val bitmap = Bitmap.createBitmap((radius * 2).toInt(), (radius * 2).toInt(), Bitmap.Config.ARGB_8888)
+        val bitmap =
+            Bitmap.createBitmap((radius * 2).toInt(), (radius * 2).toInt(), Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
         val paint = Paint()
@@ -193,5 +295,4 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         return bitmap
     }
-
 }

@@ -22,7 +22,7 @@ FDefend (short for Femme Defend) is an innovative mobile application developed f
    - Fosters a sense of community by allowing users to share safety tips, experiences, and feedback. The app encourages a collaborative effort towards creating safer environments.
 
 5. **In-App Resources:**
-   - Offers resources such as self-defense tips, legal information, and contact details of support organizations to empower women with knowledge and assistance.
+   - Offers resources such as self-defense tips and contact details of support organizations to empower women with knowledge and assistance.
 
 ### Technology Stack:
 

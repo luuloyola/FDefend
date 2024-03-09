@@ -35,7 +35,7 @@ FDefend (short for Femme Defend) is an innovative mobile application developed f
 
 1. Clone the repository:
    ```
-  https://github.com/luuloyola/FDefend.git
+    https://github.com/luuloyola/FDefend.git
    ```
 
 2. Navigate to the project directory:

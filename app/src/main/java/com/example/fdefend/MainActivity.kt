@@ -136,15 +136,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         // Agregar el marcador al mapa
         myMap.addMarker(markerOptions)
-
+        cergy_Markers(myMap)
         // Add a marker in Sydney and move the camera
         myMap.moveCamera(CameraUpdateFactory.newLatLng(my_Location))
     }
 
-    private fun Cergy_Markers(googleMap: GoogleMap){
+    private fun cergy_Markers(googleMap: GoogleMap){
         myMap = googleMap
-
-        /*
+/*
+        // Lugares que en Cergy no son seguros
+        
         // Crear un marcador personalizado con un color específico y agregarlo al mapa
         val markerOptions = MarkerOptions()
             .position(my_Location) // Ubicación del marcador
